@@ -9,7 +9,7 @@
 import concurrent.futures
 import asyncio
 import time
-from multiprocessing import Process
+from multiprocessing import Process, Pipe
 from threading import Thread
 import logging
 import logging.handlers
@@ -53,12 +53,11 @@ def block_io(name):
 
 
 async def process_task(name, woker=1):
-
     loop = asyncio.get_running_loop()
 
     if woker != 1:
         with concurrent.futures.ThreadPoolExecutor(woker) as executor:
-            workers = [loop.run_in_executor(executor, block_io, name+str(i)) for i in range(woker)]
+            workers = [loop.run_in_executor(executor, block_io, name + str(i)) for i in range(woker)]
             await asyncio.gather(*workers)
     else:
         await loop.run_in_executor(None, block_io, name)
@@ -71,17 +70,28 @@ class MyApp(object):
         self.max_process = None
         self.max_thread = None
         self.run_process = None
+        self.parent_conn, self.child_conn = Pipe()  # 生成管道实例:parent_conn, child_conn分别为管道的两头
+        self.server = None
 
     async def worker(self):
         while True:
-            # queue.pull()
-            asyncio.run_coroutine_threadsafe(async_io("张三", 3), self.loop)
-            asyncio.run_coroutine_threadsafe(async_io("李四", 2), self.loop)
+            name = self.child_conn.recv()
+            asyncio.run_coroutine_threadsafe(async_io(name, 3), self.loop)
 
-    async def create_server(self):
-        while True:
-            # queue.push()
-            pass
+    def create_server(self):
+
+        def __start_server():
+            msg_list = ["AA", "BB", "CC", "DD", "EE", "FF"]
+            while msg_list:
+                # queue.push()
+                self.parent_conn.send(msg_list.pop())
+                pass
+
+        run_server_thread = Thread(target=__start_server,
+                                   args=(),
+                                   name="run_server_thread"
+                                   )  # 新起线程运行事件循环, 防止阻塞主线程
+        run_server_thread.start()
 
     def create_loop(self):
         loop = asyncio.new_event_loop()
@@ -91,7 +101,8 @@ class MyApp(object):
             loop.run_forever()
 
         run_loop_thread = Thread(target=__start_loop,
-                                 args=(loop,)
+                                 args=(loop,),
+                                 name="run_loop_thread"
                                  )  # 新起线程运行事件循环, 防止阻塞主线程
         run_loop_thread.start()  # 运行线程，即运行协程事件循环
 
@@ -100,6 +111,9 @@ class MyApp(object):
     def start_app(self):
         if self.loop is None:
             self.loop = self.create_loop()
+        if not self.server:
+            self.create_server()
+
         if self.max_process:
             if self.run_process:
                 self.max_process -= self.run_process
