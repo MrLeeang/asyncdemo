@@ -21,19 +21,25 @@ async def async_io(name):
     print(f"[async_io][{name}]我终于跑完了")
 
 
-async def task():
+async def task(num):
     loop = asyncio.get_running_loop()
-    with concurrent.futures.ProcessPoolExecutor() as executor:
-        t1 = loop.run_in_executor(executor, bock_io, "小明")
-        t2 = loop.run_in_executor(executor, bock_io, "小红")
-    t3 = asyncio.create_task(async_io("小伟"))
-    await t3
-    await async_io("小李"), t1, t2
+    with concurrent.futures.ThreadPoolExecutor(5) as executor:
+        t1 = loop.run_in_executor(executor, bock_io, "小明"+str(num))
+        t2 = loop.run_in_executor(executor, bock_io, "小红"+str(num))
+
+        await t1, t2
+
+    # t3 = asyncio.create_task(async_io("小伟"))
+    # await t3
+    # await async_io("小李"), t1, t2
 
 
 async def main():
-    await asyncio.gather(task(), task())
+    await asyncio.gather(task(1), task(2))
 
 
 if __name__ == '__main__':
+    start = time.clock()
     asyncio.run(main())
+    elapsed = (time.clock() - start)
+    print("Time used: {}".format(elapsed))
