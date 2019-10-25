@@ -56,7 +56,7 @@ async def process_task(name, woker=1):
     loop = asyncio.get_running_loop()
 
     if woker != 1:
-        with concurrent.futures.ThreadPoolExecutor(woker) as executor:
+        with concurrent.futures.ProcessPoolExecutor(woker) as executor:
             workers = [loop.run_in_executor(executor, block_io, name + str(i)) for i in range(woker)]
             await asyncio.gather(*workers)
     else:
@@ -81,10 +81,18 @@ class MyApp(object):
     def create_server(self):
 
         def __start_server():
-            msg_list = ["AA", "BB", "CC", "DD", "EE", "FF"]
-            while msg_list:
-                # queue.push()
-                self.parent_conn.send(msg_list.pop())
+            try:
+                msg_list = ["AA", "BB", "CC", "DD", "EE", "FF"]
+                while msg_list:
+                    # queue.push()
+                    self.parent_conn.send(msg_list.pop())
+                    pass
+            except KeyboardInterrupt as e:
+                logging.error(e)
+            except Exception as e:
+                logging.error(e)
+            finally:
+                # sock.close()
                 pass
 
         run_server_thread = Thread(target=__start_server,
@@ -94,25 +102,30 @@ class MyApp(object):
         run_server_thread.start()
 
     def create_loop(self):
-        loop = asyncio.new_event_loop()
+        self.loop = asyncio.new_event_loop()
 
         def __start_loop(loop):
-            asyncio.set_event_loop(loop)
-            loop.run_forever()
+            try:
+                asyncio.set_event_loop(loop)
+                loop.run_forever()
+            except KeyboardInterrupt as e:
+                logging.error(e)
+            except Exception as e:
+                logging.error(e)
+            finally:
+                loop.close()
 
         run_loop_thread = Thread(target=__start_loop,
-                                 args=(loop,),
+                                 args=(self.loop,),
                                  name="run_loop_thread"
                                  )  # 新起线程运行事件循环, 防止阻塞主线程
         run_loop_thread.start()  # 运行线程，即运行协程事件循环
 
-        return loop
+        return self.loop
 
     def start_app(self):
         if self.loop is None:
             self.loop = self.create_loop()
-        if not self.server:
-            self.create_server()
 
         if self.max_process:
             if self.run_process:
@@ -126,6 +139,9 @@ class MyApp(object):
         asyncio.run(self.worker())
 
     def run(self, run_process=None):
+        if not self.server:
+            self.create_server()
+
         if not run_process:
             self.start_app()
         else:
@@ -137,6 +153,6 @@ class MyApp(object):
 
 if __name__ == '__main__':
     app = MyApp()
-    # app.max_thread = 10
+    app.max_thread = 10
     # app.max_process = 10
-    app.run()
+    app.run(3)
