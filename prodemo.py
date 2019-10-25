@@ -63,7 +63,7 @@ async def process_task(name, woker=1):
         await loop.run_in_executor(None, block_io, name)
 
 
-class MyApp(object):
+class Server(object):
 
     def __init__(self):
         self.loop = None
@@ -149,6 +149,15 @@ class MyApp(object):
             for _ in range(run_process):
                 t = Process(target=self.start_app)
                 t.start()
+
+
+class MyApp(Server):
+
+    def __init__(self,
+                 name=None,
+                 ):
+        self.name = name
+        super().__init__()
 
 
 if __name__ == '__main__':
