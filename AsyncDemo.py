@@ -101,6 +101,8 @@ class Server(object):
                                    )  # 新起线程运行事件循环, 防止阻塞主线程
         run_server_thread.start()
 
+        self.server = True
+
     def create_loop(self):
         self.loop = asyncio.new_event_loop()
 
@@ -142,13 +144,13 @@ class Server(object):
         if not self.server:
             self.create_server()
 
-        if not run_process:
-            self.start_app()
-        else:
+        if run_process:
             self.run_process = run_process
-            for _ in range(run_process):
+            for _ in range(run_process - 1):
                 t = Process(target=self.start_app)
+                t.daemon = True
                 t.start()
+        self.start_app()
 
 
 class MyApp(Server):
